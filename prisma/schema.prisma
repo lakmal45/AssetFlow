@@ -1,0 +1,160 @@
+// Prisma Schema for AssetFlow - Resource Reservation Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum CategoryType {
+  FACILITY
+  EQUIPMENT
+  VEHICLE
+}
+
+enum ResourceStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  RETIRED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+
+  @@map("departments")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  role         UserRole      @default(MEMBER)
+  departmentId String?
+  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  avatarUrl    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  reservations Reservation[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model ResourceCategory {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  type        CategoryType @default(FACILITY)
+  icon        String       @default("layers")
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  resources   Resource[]
+
+  @@map("resource_categories")
+}
+
+model Resource {
+  id                 String              @id @default(cuid())
+  name               String
+  code               String              @unique
+  categoryId         String
+  category           ResourceCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  location           String
+  capacity           Int?
+  description        String
+  imageUrl           String?
+  status             ResourceStatus      @default(AVAILABLE)
+  attributes         Json                @default("{}")
+  requiresApproval   Boolean             @default(false)
+  minBookingMinutes  Int                 @default(15)
+  maxBookingMinutes  Int                 @default(480)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  reservations       Reservation[]
+  maintenanceWindows MaintenanceWindow[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("resources")
+}
+
+model Reservation {
+  id              String            @id @default(cuid())
+  resourceId      String
+  resource        Resource          @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  purpose         String?
+  startTime       DateTime
+  endTime         DateTime
+  status          ReservationStatus @default(CONFIRMED)
+  attendeeCount   Int?              @default(1)
+  checkedInAt     DateTime?
+  checkedOutAt    DateTime?
+  rejectionReason String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  auditLogs       AuditLog[]
+
+  @@index([resourceId, startTime, endTime])
+  @@index([userId])
+  @@index([status])
+  @@map("reservations")
+}
+
+model MaintenanceWindow {
+  id          String   @id @default(cuid())
+  resourceId  String
+  resource    Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  performedBy String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([resourceId, startTime, endTime])
+  @@map("maintenance_windows")
+}
+
+model AuditLog {
+  id            String       @id @default(cuid())
+  reservationId String?
+  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action        String
+  details       Json?        @default("{}")
+  createdAt     DateTime     @default(now())
+
+  @@index([reservationId])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}
