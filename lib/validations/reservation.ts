@@ -8,13 +8,9 @@ export const createReservationSchema = z
       .string()
       .min(3, "Title must be at least 3 characters")
       .max(100, "Title must not exceed 100 characters"),
-    purpose: z.string().max(500, "Purpose must not exceed 500 characters").optional().default(""),
-    startTime: z.coerce.date({
-      errorMap: () => ({ message: "Invalid start time format" }),
-    }),
-    endTime: z.coerce.date({
-      errorMap: () => ({ message: "Invalid end time format" }),
-    }),
+    purpose: z.string().max(500, "Purpose must not exceed 500 characters").optional(),
+    startTime: z.coerce.date(),
+    endTime: z.coerce.date(),
     attendeeCount: z.coerce.number().int().min(1, "At least 1 attendee required").default(1),
   })
   .refine((data) => data.endTime > data.startTime, {
